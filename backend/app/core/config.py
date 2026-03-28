@@ -9,4 +9,4 @@ class Settings(BaseSettings):
     query_timeout_seconds: int = 5
     max_result_rows: int = 1000
 
-    model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
+    model_config = {"env_file": ("../.env", ".env"), "env_file_encoding": "utf-8"}
