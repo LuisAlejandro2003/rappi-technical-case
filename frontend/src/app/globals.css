@@ -1,0 +1,14 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --rappi-primary: #FF441F;
+  --rappi-dark: #1A1A2E;
+  --rappi-light: #F5F5F5;
+}
+
+body {
+  color: var(--rappi-dark);
+  background: var(--rappi-light);
+}
