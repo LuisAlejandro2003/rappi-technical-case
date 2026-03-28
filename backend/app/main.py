@@ -1,11 +1,24 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
+from app.dependencies import get_db
+from app.routers import health
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: eagerly initialize DuckDB so failures surface early
+    get_db()
+    yield
 
 
 app = FastAPI(
     title="Rappi Analytics API",
     description="NL-to-SQL analytics chatbot for Rappi operations",
     version="0.1.0",
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -16,7 +29,4 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
-@app.get("/health")
-async def health():
-    return {"status": "healthy"}
+app.include_router(health.router)
