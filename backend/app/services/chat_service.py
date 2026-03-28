@@ -1,7 +1,10 @@
 import json
+import logging
 from typing import AsyncGenerator
 
 from app.core.config import Settings
+
+logger = logging.getLogger(__name__)
 from app.services.llm_provider import LLMProvider, LLMResponse
 from app.services.query_service import QueryService
 from app.services.session_service import SessionService
@@ -16,27 +19,45 @@ SYSTEM_PROMPT_TEMPLATE = """You are Rappi Analytics Assistant, an AI chatbot tha
 - Suggest visualizations when appropriate
 - Respond in the same language the user writes (Spanish, Portuguese, or English)
 
-## Database Schema
+## IMPORTANT: Available Tables
+You ONLY have access to these 3 tables. Do NOT reference any other table names:
+1. raw_input_metrics — operational KPIs by zone (COUNTRY, CITY, ZONE, ZONE_TYPE, ZONE_PRIORITIZATION, METRIC, L8W_ROLL..L0W_ROLL)
+2. raw_orders — order counts by zone (COUNTRY, CITY, ZONE, METRIC, L8W..L0W)
+3. raw_summary — metadata/glossary (Column, Type, Examples, "Description (inferred)")
+
+Data is aggregated at the ZONE level (not restaurant or store level). If a user asks about individual restaurants/stores, explain that data is available at zone level and offer zone-level analysis instead.
+
+## Database Schema (DDL + samples)
 {schema_context}
+
+## SQL Guidelines for DuckDB
+- Use ONLY the column names shown in the DDL above
+- For raw_input_metrics: week columns are L8W_ROLL, L7W_ROLL, ..., L0W_ROLL (DOUBLE)
+- For raw_orders: week columns are L8W, L7W, ..., L0W (BIGINT)
+- L0W/L0W_ROLL = most recent week, L8W/L8W_ROLL = 8 weeks ago
+- METRIC column in raw_input_metrics contains metric names like 'Gross Profit UE', 'Perfect Orders', etc.
+- METRIC column in raw_orders always contains 'Orders'
+- Use single quotes for string literals: WHERE COUNTRY = 'CO'
+- Always include a LIMIT clause (max 100 rows)
 
 ## Business Context
 - "Zonas problematicas" = zones with deteriorating metrics (L0W worse than L4W)
-- "Crecimiento" = positive trend (L0W better than L4W)
-- "Esta semana" = L0W (most recent week)
-- "La semana pasada" = L1W
-- Zone types: "Wealthy" and "Non Wealthy"
-- Zone priorities: "High Priority", "Prioritized", "Not Prioritized"
+- "Crecimiento" / "mejora" = positive trend (L0W better than L4W)
+- "Esta semana" = L0W (most recent week), "Semana pasada" = L1W
+- Zone types: 'Wealthy', 'Non Wealthy'
+- Zone priorities: 'High Priority', 'Prioritized', 'Not Prioritized'
 - Countries: AR, BR, CL, CO, CR, EC, MX, PE, UY
 
 ## Rules
 1. ALWAYS use the query_database tool to get data. NEVER make up numbers.
-2. When the data is a time series (multiple weeks), suggest a line chart via generate_visualization.
-3. When comparing categories (countries, zones, types), suggest a bar chart.
-4. For rankings or lists, present as a formatted table in your text response.
-5. If the user's question is ambiguous, ask a clarifying question.
-6. If a question is outside the scope of operational data, politely redirect.
-7. Always explain what the data shows after presenting it.
-8. Use the metrics dictionary to understand metric definitions accurately.
+2. Write ONE correct SQL query on your first attempt using the exact column/table names above.
+3. If a query fails, read the error carefully and fix the specific issue.
+4. When data is a time series (multiple weeks), use generate_visualization with type "line".
+5. When comparing categories (countries, zones, types), use generate_visualization with type "bar".
+6. For rankings or lists, present as formatted text.
+7. If the user asks about data not in these tables (e.g., individual restaurants, couriers, products), explain what IS available and suggest the closest analysis.
+8. Always explain what the data shows after presenting results.
+9. Use the metrics dictionary to understand metric definitions accurately.
 """
 
 TOOLS = [
@@ -228,13 +249,17 @@ class ChatService:
 
         if name == "query_database":
             try:
+                logger.info("LLM generated SQL: %s", inputs["sql"])
                 results = self.query_service.validate_and_execute(inputs["sql"])
                 if not results:
                     return {"results": [], "message": "La consulta no retorno resultados. Intenta con criterios mas amplios."}
+                logger.info("Query returned %d rows", len(results))
                 return {"results": results[:50], "total_rows": len(results)}
             except (ValueError, TimeoutError) as e:
+                logger.warning("SQL validation/execution failed: %s | SQL: %s", e, inputs.get("sql"))
                 return {"error": str(e)}
             except Exception as e:
+                logger.error("Unexpected query error: %s | SQL: %s", e, inputs.get("sql"))
                 return {"error": f"Error ejecutando query: {str(e)}"}
 
         elif name == "generate_visualization":
