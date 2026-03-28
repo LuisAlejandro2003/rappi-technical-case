@@ -83,7 +83,7 @@ class TestSessions:
         session_service.create_session()
         session_service.create_session()
 
-        response = client.get("/sessions")
+        response = client.get("/chat/sessions")
         assert response.status_code == 200
         data = response.json()
         assert len(data) == 2
@@ -95,7 +95,7 @@ class TestSessions:
         session_service.add_message(sid, Message(role="user", content="Hi"))
         session_service.add_message(sid, Message(role="assistant", content="Hello!"))
 
-        response = client.get(f"/sessions/{sid}")
+        response = client.get(f"/chat/sessions/{sid}")
         assert response.status_code == 200
         data = response.json()
         assert data["id"] == sid

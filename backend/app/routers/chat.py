@@ -9,10 +9,10 @@ from app.services.session_service import SessionService
 from app.core.database import DuckDBService
 from app.dependencies import get_chat_service, get_session_service, get_db
 
-router = APIRouter()
+router = APIRouter(prefix="/chat")
 
 
-@router.post("/chat/stream")
+@router.post("/stream")
 async def chat_stream(request: ChatRequest, chat_service: ChatService = Depends(get_chat_service)):
     async def event_generator():
         async for event in chat_service.process_message(request.session_id, request.message):
