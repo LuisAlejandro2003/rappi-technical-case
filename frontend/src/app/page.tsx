@@ -8,7 +8,7 @@ import { MessageList } from '@/features/chat/components/message-list';
 import { useChatStream } from '@/features/chat/hooks/use-chat-stream';
 import { useChatStore } from '@/stores/chat-store';
 import { useSessionStore } from '@/stores/session-store';
-import type { ProactiveSuggestion } from '@/types/api';
+
 
 function generateId(): string {
   return `${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
@@ -18,12 +18,14 @@ export default function Home() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { sendMessage, isStreaming } = useChatStream();
   const { setMessages } = useChatStore();
-  const { addSession, fetchSessions } = useSessionStore();
+  const { addSession, fetchSessions, fetchSuggestions, fetchDataFreshness, suggestions, dataFreshness } = useSessionStore();
 
-  // Fetch sessions on mount
+  // Fetch sessions, suggestions and data freshness on mount
   useEffect(() => {
     fetchSessions();
-  }, [fetchSessions]);
+    fetchSuggestions();
+    fetchDataFreshness();
+  }, [fetchSessions, fetchSuggestions, fetchDataFreshness]);
 
   const handleSend = useCallback(
     (text: string) => {
@@ -52,14 +54,12 @@ export default function Home() {
     [sendMessage]
   );
 
-  // Placeholder suggestions (will come from backend in Phase 6)
-  const suggestions: ProactiveSuggestion[] = [];
-
   return (
     <div className="h-screen flex flex-col overflow-hidden">
       <Header
         onToggleSidebar={() => setSidebarOpen((prev) => !prev)}
         onNewSession={handleNewSession}
+        dataFreshness={dataFreshness}
       />
 
       <div className="flex-1 flex overflow-hidden relative">

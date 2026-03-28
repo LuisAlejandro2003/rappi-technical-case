@@ -1,9 +1,38 @@
 "use client";
 
-import { BarChart2, AlertCircle, RotateCcw } from 'lucide-react';
+import { BarChart2, AlertCircle, RotateCcw, ArrowRight } from 'lucide-react';
 import { motion } from 'motion/react';
 import type { Message } from '@/types/api';
 import { DynamicChart } from '@/features/visualization/components/dynamic-chart';
+
+function generateFollowUps(message: Message): string[] {
+  const followUps: string[] = [];
+  const content = message.content.toLowerCase();
+
+  // If response mentions a country, suggest exploring cities
+  const countries = ['colombia', 'mexico', 'brasil', 'chile', 'peru', 'argentina', 'ecuador', 'costa rica', 'uruguay'];
+  for (const country of countries) {
+    if (content.includes(country)) {
+      followUps.push(`Ver otras ciudades de ${country.charAt(0).toUpperCase() + country.slice(1)}`);
+      break;
+    }
+  }
+
+  // If response has a table, suggest chart view
+  if (message.responseType === 'table') {
+    followUps.push('Ver como grafico');
+  }
+
+  // If response has a chart, suggest exporting data
+  if (message.responseType === 'line-chart' || message.responseType === 'bar-chart') {
+    followUps.push('Exportar datos en tabla');
+  }
+
+  // Always include a generic deepening suggestion
+  followUps.push('Profundizar en este analisis');
+
+  return followUps.slice(0, 3);
+}
 
 function formatTime(date: Date): string {
   return new Date(date).toLocaleTimeString('es-CO', {
@@ -39,10 +68,13 @@ export function UserMessage({ message }: UserMessageProps) {
 interface BotMessageProps {
   message: Message;
   onRetry?: (content: string) => void;
+  onFollowUp?: (text: string) => void;
+  isLatest?: boolean;
 }
 
-export function BotMessage({ message, onRetry }: BotMessageProps) {
+export function BotMessage({ message, onRetry, onFollowUp, isLatest }: BotMessageProps) {
   const isError = message.responseType === 'error';
+  const followUps = !isError && isLatest && onFollowUp ? generateFollowUps(message) : [];
 
   return (
     <motion.div
@@ -99,6 +131,22 @@ export function BotMessage({ message, onRetry }: BotMessageProps) {
         <span className="text-xs text-gray-400 mt-1 ml-1">
           {formatTime(message.timestamp)}
         </span>
+
+        {/* Follow-up suggestion chips */}
+        {followUps.length > 0 && (
+          <div className="flex flex-wrap gap-2 mt-2">
+            {followUps.map((text) => (
+              <button
+                key={text}
+                onClick={() => onFollowUp?.(text)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-full border border-gray-200 text-gray-600 hover:border-[#FF441F] hover:text-[#FF441F] hover:bg-orange-50/50 transition-colors"
+              >
+                <ArrowRight size={10} />
+                {text}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     </motion.div>
   );

@@ -26,13 +26,22 @@ export function MessageList({ onSuggestionClick }: MessageListProps) {
           <WelcomeCard onSuggestionClick={onSuggestionClick} />
         ) : (
           <div className="space-y-6">
-            {messages.map((msg) =>
-              msg.type === 'user' ? (
+            {messages.map((msg, idx) => {
+              const isLatestBot =
+                msg.type === 'bot' &&
+                !isStreaming &&
+                idx === messages.length - 1;
+              return msg.type === 'user' ? (
                 <UserMessage key={msg.id} message={msg} />
               ) : (
-                <BotMessage key={msg.id} message={msg} />
-              )
-            )}
+                <BotMessage
+                  key={msg.id}
+                  message={msg}
+                  onFollowUp={onSuggestionClick}
+                  isLatest={isLatestBot}
+                />
+              );
+            })}
 
             {/* Streaming text preview */}
             {isStreaming && streamingText && (

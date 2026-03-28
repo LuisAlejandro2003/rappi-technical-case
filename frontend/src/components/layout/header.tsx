@@ -1,16 +1,22 @@
 "use client";
 
-import { BarChart2, Plus, Menu, ChevronDown, Circle } from 'lucide-react';
+import { BarChart2, Plus, Menu, ChevronDown, Circle, Database } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { useSessionStore } from '@/stores/session-store';
 import type { Session } from '@/types/api';
 
+interface DataFreshness {
+  last_updated: string;
+  tables: Record<string, number>;
+}
+
 interface HeaderProps {
   onToggleSidebar: () => void;
   onNewSession: () => void;
+  dataFreshness?: DataFreshness | null;
 }
 
-export function Header({ onToggleSidebar, onNewSession }: HeaderProps) {
+export function Header({ onToggleSidebar, onNewSession, dataFreshness }: HeaderProps) {
   const { sessions, activeSessionId, setActiveSession } = useSessionStore();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -98,6 +104,15 @@ export function Header({ onToggleSidebar, onNewSession }: HeaderProps) {
         )}
       </div>
 
+      {/* Data freshness indicator */}
+      <div className="flex items-center gap-2">
+        {dataFreshness && (
+          <div className="hidden md:flex items-center gap-1.5 text-xs text-gray-400">
+            <Database size={12} />
+            <span>{dataFreshness.last_updated}</span>
+          </div>
+        )}
+
       {/* Right: new session button */}
       <button
         onClick={onNewSession}
@@ -106,6 +121,7 @@ export function Header({ onToggleSidebar, onNewSession }: HeaderProps) {
         <Plus size={14} />
         <span className="hidden sm:inline">Nueva sesion</span>
       </button>
+      </div>
     </header>
   );
 }

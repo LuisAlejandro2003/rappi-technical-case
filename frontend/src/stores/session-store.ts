@@ -1,19 +1,32 @@
 import { create } from 'zustand';
-import type { Session } from '@/types/api';
+import type { Session, ProactiveSuggestion } from '@/types/api';
 import { apiFetch } from '@/lib/api';
+
+interface DataFreshness {
+  last_updated: string;
+  tables: Record<string, number>;
+}
 
 interface SessionState {
   activeSessionId: string | null;
   sessions: Session[];
+  sessionsLoading: boolean;
+  suggestions: ProactiveSuggestion[];
+  dataFreshness: DataFreshness | null;
   setActiveSession: (id: string) => void;
   addSession: (session: Session) => void;
   updateSession: (id: string, updates: Partial<Session>) => void;
   fetchSessions: () => Promise<void>;
+  fetchSuggestions: () => Promise<void>;
+  fetchDataFreshness: () => Promise<void>;
 }
 
 export const useSessionStore = create<SessionState>((set) => ({
   activeSessionId: null,
   sessions: [],
+  sessionsLoading: false,
+  suggestions: [],
+  dataFreshness: null,
 
   setActiveSession: (id) =>
     set({ activeSessionId: id }),
@@ -32,6 +45,7 @@ export const useSessionStore = create<SessionState>((set) => ({
     })),
 
   fetchSessions: async () => {
+    set({ sessionsLoading: true });
     try {
       const data = await apiFetch<{ sessions: Array<{ session_id: string; title: string; created_at: string; message_count: number }> }>('/chat/sessions');
       const sessions: Session[] = data.sessions.map((s) => ({
@@ -41,9 +55,27 @@ export const useSessionStore = create<SessionState>((set) => ({
         messages: [],
         preview: `${s.message_count} mensajes`,
       }));
-      set({ sessions });
+      set({ sessions, sessionsLoading: false });
     } catch {
-      // API not available, keep empty sessions
+      set({ sessionsLoading: false });
+    }
+  },
+
+  fetchSuggestions: async () => {
+    try {
+      const suggestions = await apiFetch<ProactiveSuggestion[]>('/chat/suggestions');
+      set({ suggestions });
+    } catch {
+      // API not available, keep empty suggestions
+    }
+  },
+
+  fetchDataFreshness: async () => {
+    try {
+      const data = await apiFetch<DataFreshness>('/chat/data-freshness');
+      set({ dataFreshness: data });
+    } catch {
+      // API not available
     }
   },
 }));

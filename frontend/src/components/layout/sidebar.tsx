@@ -39,7 +39,7 @@ export function Sidebar({
   onSelectSuggestion,
   suggestions = [],
 }: SidebarProps) {
-  const { sessions, activeSessionId, setActiveSession } = useSessionStore();
+  const { sessions, activeSessionId, setActiveSession, sessionsLoading } = useSessionStore();
 
   const handleSessionClick = (session: Session) => {
     setActiveSession(session.id);
@@ -91,41 +91,54 @@ export function Sidebar({
                   </span>
                 </div>
                 <div className="space-y-1">
-                  {sessions.map((session) => {
-                    const isActive = session.id === activeSessionId;
-                    return (
-                      <button
-                        key={session.id}
-                        onClick={() => handleSessionClick(session)}
-                        className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left transition-colors ${
-                          isActive
-                            ? 'bg-orange-50 border border-orange-200'
-                            : 'hover:bg-gray-50 border border-transparent'
-                        }`}
-                      >
-                        <MessageSquare
-                          size={13}
-                          className={isActive ? 'text-[#FF441F]' : 'text-gray-400'}
-                        />
-                        <div className="flex-1 min-w-0">
-                          <p
-                            className={`text-sm truncate ${
-                              isActive ? 'text-[#FF441F] font-medium' : 'text-gray-700'
-                            }`}
-                          >
-                            {session.name}
-                          </p>
-                          <p className="text-xs text-gray-400">
-                            {timeAgo(session.timestamp)}
-                          </p>
+                  {sessionsLoading ? (
+                    <>
+                      {[1, 2, 3].map((i) => (
+                        <div key={i} className="flex items-center gap-2.5 px-3 py-2 animate-pulse">
+                          <div className="w-3.5 h-3.5 bg-gray-200 rounded" />
+                          <div className="flex-1 space-y-1.5">
+                            <div className="h-3.5 bg-gray-200 rounded w-3/4" />
+                            <div className="h-2.5 bg-gray-100 rounded w-1/2" />
+                          </div>
                         </div>
-                      </button>
-                    );
-                  })}
-                  {sessions.length === 0 && (
+                      ))}
+                    </>
+                  ) : sessions.length === 0 ? (
                     <p className="text-xs text-gray-400 px-3 py-2">
                       No hay sesiones previas
                     </p>
+                  ) : (
+                    sessions.map((session) => {
+                      const isActive = session.id === activeSessionId;
+                      return (
+                        <button
+                          key={session.id}
+                          onClick={() => handleSessionClick(session)}
+                          className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left transition-colors ${
+                            isActive
+                              ? 'bg-orange-50 border border-orange-200'
+                              : 'hover:bg-gray-50 border border-transparent'
+                          }`}
+                        >
+                          <MessageSquare
+                            size={13}
+                            className={isActive ? 'text-[#FF441F]' : 'text-gray-400'}
+                          />
+                          <div className="flex-1 min-w-0">
+                            <p
+                              className={`text-sm truncate ${
+                                isActive ? 'text-[#FF441F] font-medium' : 'text-gray-700'
+                              }`}
+                            >
+                              {session.name}
+                            </p>
+                            <p className="text-xs text-gray-400">
+                              {timeAgo(session.timestamp)}
+                            </p>
+                          </div>
+                        </button>
+                      );
+                    })
                   )}
                 </div>
               </div>
