@@ -121,11 +121,19 @@ def validate_sql(
             if t_key.lower() == tbl:
                 all_allowed_cols.update(c.upper() for c in cols)
 
-    # Only validate explicit column references (skip star, aggregations, etc.)
+    # Collect SELECT aliases so ORDER BY / HAVING can reference them
+    select_aliases: set[str] = set()
+    for sel_expr in statement.expressions:
+        if isinstance(sel_expr, exp.Alias):
+            select_aliases.add(sel_expr.alias.upper())
+
+    # Only validate explicit column references (skip star, aliases, aggregations)
     for col_node in statement.find_all(exp.Column):
         col_name = col_node.name.upper()
-        # Skip columns that are part of a table.* expression
         if col_name == "*":
+            continue
+        # Allow references to SELECT aliases (e.g. ORDER BY total_orders)
+        if col_name in select_aliases:
             continue
         if col_name not in all_allowed_cols:
             raise ValueError(
