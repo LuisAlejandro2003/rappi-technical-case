@@ -1,0 +1,36 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --rappi-primary: #FF441F;
+  --rappi-primary-hover: #E03A18;
+  --rappi-dark: #1A1A2E;
+  --rappi-light: #F5F5F5;
+  --rappi-bg: #F8F9FA;
+  --rappi-orange-50: #FFF7ED;
+  --rappi-orange-100: #FFEDD5;
+}
+
+body {
+  color: var(--rappi-dark);
+  background: var(--rappi-bg);
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #D1D5DB;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #9CA3AF;
+}
