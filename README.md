@@ -86,7 +86,7 @@ DuckDB es un motor OLAP columnar in-memory. Para queries analiticas (GROUP BY, M
 
 Usamos el Anthropic SDK directamente con un `LLMProvider` Protocol para abstraccion. No usamos LangChain.
 
-**Por que**: LangChain agrega 4-5 llamadas LLM innecesarias por interaccion y oculta el flujo de control. Con el SDK directo, el tool loop es explicito (max 5 iteraciones), controlamos exactamente que ve el LLM, y podemos hacer swap a otro proveedor implementando el mismo Protocol.
+**Por que**: LangChain agrega overhead de abstraccion (chains, agents, parsers) que ocultan el flujo de control y dificultan el debugging. Con el SDK directo, el tool loop es transparente — vemos exactamente que mensajes recibe el LLM, que tools invoca, y que resultados obtiene. Ademas, el `LLMProvider` Protocol permite hacer swap a otro proveedor (GPT-4, Gemini) con una sola implementacion.
 
 ### DT-004: Pipeline hibrido para Insights (SQL + LLM)
 
