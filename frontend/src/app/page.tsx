@@ -18,14 +18,17 @@ export default function Home() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { sendMessage, isStreaming } = useChatStream();
   const { setMessages } = useChatStore();
-  const { addSession, fetchSessions, fetchSuggestions, fetchDataFreshness, suggestions, dataFreshness } = useSessionStore();
+  const { addSession, fetchSessions, fetchSuggestions, fetchDataFreshness, restoreActiveSession, suggestions, dataFreshness } = useSessionStore();
 
   // Fetch sessions, suggestions and data freshness on mount
   useEffect(() => {
-    fetchSessions();
+    fetchSessions().then(() => {
+      // After sessions are loaded, restore the previously active session
+      restoreActiveSession();
+    });
     fetchSuggestions();
     fetchDataFreshness();
-  }, [fetchSessions, fetchSuggestions, fetchDataFreshness]);
+  }, [fetchSessions, fetchSuggestions, fetchDataFreshness, restoreActiveSession]);
 
   const handleSend = useCallback(
     (text: string) => {
@@ -41,7 +44,7 @@ export default function Home() {
       timestamp: new Date(),
       messages: [],
     };
-    addSession(newSession);
+    addSession(newSession); // also persists to localStorage
     setMessages([]);
     setSidebarOpen(false);
   }, [addSession, setMessages]);

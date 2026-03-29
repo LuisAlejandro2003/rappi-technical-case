@@ -9,6 +9,7 @@ import {
   Tooltip,
   ResponsiveContainer,
   Cell,
+  ReferenceLine,
 } from 'recharts';
 import { ChartContainer, useChartExport } from './chart-container';
 import { ChartTooltip } from './chart-tooltip';
@@ -33,8 +34,13 @@ export function BarChartCard({ data }: BarChartCardProps) {
   const { title, points, yAxisLabel, xAxisLabel } = data;
   const { copyToClipboard, downloadCSV } = useChartExport();
 
-  const maxValue = Math.max(...points.map((p) => p.value));
-  const yDomain: [number, number] = [0, Math.ceil(maxValue * 1.15)];
+  const values = points.map((p) => Number(p.value) || 0);
+  const maxValue = Math.max(...values);
+  const minValue = Math.min(...values);
+  const yDomain: [number, number] = [
+    minValue < 0 ? Math.floor(minValue * 1.15) : 0,
+    Math.ceil(maxValue * 1.15),
+  ];
 
   const handleCopy = useCallback(() => {
     const header = `${xAxisLabel || 'Label'}\t${yAxisLabel || 'Value'}`;
@@ -81,16 +87,17 @@ export function BarChartCard({ data }: BarChartCardProps) {
             }
           />
           <Tooltip content={<ChartTooltip />} />
+          {minValue < 0 && <ReferenceLine y={0} stroke="#9CA3AF" strokeDasharray="3 3" />}
           <Bar
             dataKey="value"
             name={yAxisLabel || 'Valor'}
             radius={[4, 4, 0, 0]}
             maxBarSize={48}
           >
-            {points.map((_, index) => (
+            {points.map((point, index) => (
               <Cell
                 key={`cell-${index}`}
-                fill={BAR_COLORS[index % BAR_COLORS.length]}
+                fill={(Number(point.value) || 0) < 0 ? '#EF4444' : BAR_COLORS[index % BAR_COLORS.length]}
               />
             ))}
           </Bar>

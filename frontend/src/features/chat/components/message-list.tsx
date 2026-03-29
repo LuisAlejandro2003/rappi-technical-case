@@ -7,6 +7,7 @@ import { UserMessage, BotMessage } from './message-bubble';
 import { TypingIndicator } from './typing-indicator';
 import { BarChart2 } from 'lucide-react';
 import { motion } from 'motion/react';
+import { MarkdownRenderer } from './markdown-renderer';
 
 interface MessageListProps {
   onSuggestionClick: (text: string) => void;
@@ -55,7 +56,7 @@ export function MessageList({ onSuggestionClick }: MessageListProps) {
                 </div>
                 <div className="max-w-[85%]">
                   <div className="bg-white border border-gray-100 px-4 py-2.5 rounded-2xl rounded-tl-sm text-sm leading-relaxed shadow-sm text-gray-800">
-                    <p className="whitespace-pre-wrap">{streamingText}</p>
+                    <MarkdownRenderer content={streamingText} />
                   </div>
                 </div>
               </motion.div>

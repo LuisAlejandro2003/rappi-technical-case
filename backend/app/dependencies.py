@@ -6,6 +6,7 @@ from app.services.session_service import SessionService
 from app.services.query_service import QueryService
 from app.services.chat_service import ChatService
 from app.services.llm_provider import ClaudeLLMProvider
+from app.services.data_profiler import DataProfiler
 
 
 @lru_cache
@@ -26,13 +27,14 @@ def get_db() -> DuckDBService:
 
 _session_service: SessionService | None = None
 _query_service: QueryService | None = None
+_data_profiler: DataProfiler | None = None
 _chat_service: ChatService | None = None
 
 
 def get_session_service() -> SessionService:
     global _session_service
     if _session_service is None:
-        _session_service = SessionService()  # in-memory SQLite
+        _session_service = SessionService()  # file-based SQLite in data/sessions.db
     return _session_service
 
 
@@ -41,6 +43,13 @@ def get_query_service() -> QueryService:
     if _query_service is None:
         _query_service = QueryService(get_db(), get_settings())
     return _query_service
+
+
+def get_data_profiler() -> DataProfiler:
+    global _data_profiler
+    if _data_profiler is None:
+        _data_profiler = DataProfiler(get_db())
+    return _data_profiler
 
 
 def get_chat_service() -> ChatService:
@@ -53,5 +62,6 @@ def get_chat_service() -> ChatService:
             query_service=get_query_service(),
             session_service=get_session_service(),
             settings=settings,
+            data_profiler=get_data_profiler(),
         )
     return _chat_service

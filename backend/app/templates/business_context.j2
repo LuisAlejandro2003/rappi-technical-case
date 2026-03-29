@@ -1,0 +1,54 @@
+## Business Context & Glossary
+- "Zonas problematicas" = zones with deteriorating metrics (L0W worse than L4W)
+- "Zonas calientes" / "zonas top" = zones in the top quartile of performance
+- "Zonas en riesgo" = zones with declining trend over 3+ consecutive weeks
+- "Crecimiento" / "mejora" = positive trend (L0W better than L4W)
+- "Cobertura" = Lead Penetration metric
+- "Rentabilidad" = Gross Profit UE metric
+- "Calidad de servicio" / "nivel de servicio" = Perfect Orders metric
+- "Adopcion" = Pro Adoption or Turbo Adoption metrics
+- "Esta semana" / "semana actual" = L0W / L0W_ROLL (most recent week)
+- "Semana pasada" = L1W / L1W_ROLL
+- "Ultimas 4 semanas" = L3W to L0W (or L3W_ROLL to L0W_ROLL)
+- "Mes pasado" / "ultimo mes" = approximately L4W to L1W
+- "Ultimas 8 semanas" / "trimestre" = L7W to L0W (full available range)
+- "YoY" / "interanual" = NOT available — only 9 weeks of data exist
+- "Zona wealthy" / "zona premium" = WHERE ZONE_TYPE = 'Wealthy'
+- "Zona popular" / "no wealthy" = WHERE ZONE_TYPE = 'Non Wealthy'
+- Zone types: 'Wealthy', 'Non Wealthy'
+- Zone priorities: 'High Priority', 'Prioritized', 'Not Prioritized'
+- Countries: AR, BR, CL, CO, CR, EC, MX, PE, UY
+
+## Metric Relationships & Thresholds
+- Perfect Orders > 90% is strong; < 80% is concerning. Reflects operational/service quality.
+- Lead Penetration drives order growth: higher coverage means more stores available to users.
+- Gross Profit UE measures unit economics profitability per order.
+- Pro Adoption and Turbo Adoption measure subscription penetration; higher adoption improves retention and order frequency.
+- Data structure: raw_input_metrics has ONE row per zone per metric (weeks as columns L8W_ROLL..L0W_ROLL). raw_orders has ONE row per zone (weeks as columns L8W..L0W, METRIC is always 'Orders').
+
+## Few-Shot SQL Examples
+
+Example 1 — Ranking zones by a metric:
+User: "Top 5 zonas con mayor Perfect Orders"
+SQL: SELECT ZONE, CITY, COUNTRY, L0W_ROLL FROM raw_input_metrics WHERE METRIC = 'Perfect Orders' ORDER BY L0W_ROLL DESC LIMIT 5
+Why: Filter by METRIC, order by most recent week (L0W_ROLL), limit results.
+
+Example 2 — Comparing zone types:
+User: "Compara Wealthy vs Non Wealthy en Colombia"
+SQL: SELECT ZONE_TYPE, AVG(L0W_ROLL) AS avg_current FROM raw_input_metrics WHERE COUNTRY = 'CO' AND METRIC = 'Perfect Orders' GROUP BY ZONE_TYPE LIMIT 100
+Why: Filter by country, group by ZONE_TYPE to compare segments.
+
+Example 3 — Temporal trend for a city:
+User: "Evolucion de ordenes en Bogota"
+SQL: SELECT ZONE, L8W, L7W, L6W, L5W, L4W, L3W, L2W, L1W, L0W FROM raw_orders WHERE CITY = 'Bogota' LIMIT 50
+Why: Select all week columns from raw_orders to show the full 9-week trend. No METRIC filter needed since raw_orders only has 'Orders'.
+
+Example 4 — Aggregation by country:
+User: "Promedio de Lead Penetration por pais"
+SQL: SELECT COUNTRY, AVG(L0W_ROLL) AS avg_lead_pen FROM raw_input_metrics WHERE METRIC = 'Lead Penetration' GROUP BY COUNTRY ORDER BY avg_lead_pen DESC LIMIT 100
+Why: Use AVG + GROUP BY COUNTRY for cross-country comparison of a single metric.
+
+Example 5 — Multi-metric analysis (zones with high coverage but low service quality):
+User: "Zonas con alto Lead Penetration pero bajo Perfect Orders"
+SQL: SELECT lp.ZONE, lp.CITY, lp.COUNTRY, lp.L0W_ROLL AS lead_pen, po.L0W_ROLL AS perfect_orders FROM raw_input_metrics lp JOIN raw_input_metrics po ON lp.ZONE = po.ZONE WHERE lp.METRIC = 'Lead Penetration' AND po.METRIC = 'Perfect Orders' AND lp.L0W_ROLL > 0.5 AND po.L0W_ROLL < 0.8 ORDER BY lp.L0W_ROLL DESC LIMIT 50
+Why: Self-join raw_input_metrics to compare two metrics for the same zone. Filter thresholds to find the mismatch.

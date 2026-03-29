@@ -1,6 +1,7 @@
 "use client";
 
-import { Plus, Clock, Lightbulb, MessageSquare, X } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { Plus, Clock, Lightbulb, MessageSquare, X, Trash2, MoreHorizontal } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useSessionStore } from '@/stores/session-store';
 import type { Session, ProactiveSuggestion } from '@/types/api';
@@ -23,13 +24,101 @@ const categoryColors: Record<string, string> = {
 function timeAgo(date: Date): string {
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
-  const diffMins = Math.floor(diffMs / 60000);
+  const diffMins = Math.floor(Math.abs(diffMs) / 60000);
   if (diffMins < 1) return 'Ahora';
   if (diffMins < 60) return `Hace ${diffMins}m`;
   const diffHours = Math.floor(diffMins / 60);
   if (diffHours < 24) return `Hace ${diffHours}h`;
   const diffDays = Math.floor(diffHours / 24);
   return `Hace ${diffDays}d`;
+}
+
+function SessionItem({
+  session,
+  isActive,
+  onSelect,
+  onDelete,
+}: {
+  session: Session;
+  isActive: boolean;
+  onSelect: () => void;
+  onDelete: () => void;
+}) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Close menu on outside click
+  useEffect(() => {
+    if (!menuOpen) return;
+    function handleClick(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [menuOpen]);
+
+  return (
+    <div className="group relative">
+      <button
+        onClick={onSelect}
+        className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left transition-colors ${
+          isActive
+            ? 'bg-orange-50 border border-orange-200'
+            : 'hover:bg-gray-50 border border-transparent'
+        }`}
+      >
+        <MessageSquare
+          size={13}
+          className={isActive ? 'text-[#FF441F]' : 'text-gray-400'}
+        />
+        <div className="flex-1 min-w-0">
+          <p
+            className={`text-sm truncate pr-6 ${
+              isActive ? 'text-[#FF441F] font-medium' : 'text-gray-700'
+            }`}
+          >
+            {session.name}
+          </p>
+          <p className="text-xs text-gray-400">
+            {timeAgo(session.timestamp)}
+          </p>
+        </div>
+      </button>
+
+      {/* Three-dot menu trigger */}
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          setMenuOpen((prev) => !prev);
+        }}
+        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 opacity-0 group-hover:opacity-100 transition-all"
+      >
+        <MoreHorizontal size={14} />
+      </button>
+
+      {/* Dropdown menu */}
+      {menuOpen && (
+        <div
+          ref={menuRef}
+          className="absolute right-1 top-full mt-1 z-50 bg-white rounded-lg shadow-lg border border-gray-200 py-1 min-w-[140px]"
+        >
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setMenuOpen(false);
+              onDelete();
+            }}
+            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+          >
+            <Trash2 size={13} />
+            Eliminar
+          </button>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function Sidebar({
@@ -39,10 +128,11 @@ export function Sidebar({
   onSelectSuggestion,
   suggestions = [],
 }: SidebarProps) {
-  const { sessions, activeSessionId, setActiveSession, sessionsLoading } = useSessionStore();
+  const { sessions, activeSessionId, setActiveSession, loadSessionMessages, deleteSession, sessionsLoading } = useSessionStore();
 
   const handleSessionClick = (session: Session) => {
     setActiveSession(session.id);
+    loadSessionMessages(session.id);
   };
 
   return (
@@ -108,37 +198,15 @@ export function Sidebar({
                       No hay sesiones previas
                     </p>
                   ) : (
-                    sessions.map((session) => {
-                      const isActive = session.id === activeSessionId;
-                      return (
-                        <button
-                          key={session.id}
-                          onClick={() => handleSessionClick(session)}
-                          className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left transition-colors ${
-                            isActive
-                              ? 'bg-orange-50 border border-orange-200'
-                              : 'hover:bg-gray-50 border border-transparent'
-                          }`}
-                        >
-                          <MessageSquare
-                            size={13}
-                            className={isActive ? 'text-[#FF441F]' : 'text-gray-400'}
-                          />
-                          <div className="flex-1 min-w-0">
-                            <p
-                              className={`text-sm truncate ${
-                                isActive ? 'text-[#FF441F] font-medium' : 'text-gray-700'
-                              }`}
-                            >
-                              {session.name}
-                            </p>
-                            <p className="text-xs text-gray-400">
-                              {timeAgo(session.timestamp)}
-                            </p>
-                          </div>
-                        </button>
-                      );
-                    })
+                    sessions.map((session) => (
+                      <SessionItem
+                        key={session.id}
+                        session={session}
+                        isActive={session.id === activeSessionId}
+                        onSelect={() => handleSessionClick(session)}
+                        onDelete={() => deleteSession(session.id)}
+                      />
+                    ))
                   )}
                 </div>
               </div>

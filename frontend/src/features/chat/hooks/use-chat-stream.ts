@@ -5,32 +5,10 @@ import { useChatStore } from '@/stores/chat-store';
 import { useSessionStore } from '@/stores/session-store';
 import { API_BASE_URL } from '@/lib/api';
 import type { Message, ResponseType, TableData, ChartData } from '@/types/api';
+import { vizConfigToChartData, vizConfigToTableData } from '@/lib/viz-utils';
 
 function generateId(): string {
   return `msg_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
-}
-
-/** Convert backend VizConfig to frontend ChartData format */
-function vizConfigToChartData(data: Record<string, unknown>): ChartData {
-  const xAxis = (data.x_axis as string[]) || [];
-  const series = (data.series as Array<{ name: string; data: number[] }>) || [];
-
-  // Build chart points from x_axis + first series
-  const points = xAxis.map((label, i) => ({
-    label,
-    value: series[0]?.data[i] ?? 0,
-    ...(series[1] ? { value2: series[1].data[i] } : {}),
-  }));
-
-  return {
-    title: (data.title as string) || '',
-    points,
-    series: series.map((s, i) => ({
-      key: i === 0 ? 'value' : `value${i + 1}`,
-      label: s.name,
-      color: ['#FF441F', '#FF6B45', '#FF8C6B'][i] || '#FF441F',
-    })),
-  };
 }
 
 export function useChatStream() {
@@ -74,6 +52,7 @@ export function useChatStream() {
       let responseType: ResponseType = 'text';
       let tableData: TableData | undefined;
       let chartData: ChartData | undefined;
+      let followUpSuggestions: string[] = [];
 
       try {
         const res = await fetch(`${API_BASE_URL}/chat/stream`, {
@@ -160,14 +139,7 @@ export function useChatStream() {
                 const vizType = (data.type as string) || '';
                 if (vizType === 'table') {
                   responseType = 'table';
-                  tableData = {
-                    title: (data.title as string) || '',
-                    columns: ((data.x_axis as string[]) || []).map((col) => ({
-                      key: col,
-                      label: col,
-                    })),
-                    rows: (data.raw_data as Record<string, string | number>[]) || [],
-                  };
+                  tableData = vizConfigToTableData(data);
                 } else if (vizType === 'line') {
                   responseType = 'line-chart';
                   chartData = vizConfigToChartData(data);
@@ -177,6 +149,10 @@ export function useChatStream() {
                 }
                 break;
               }
+
+              case 'follow_up_suggestions':
+                followUpSuggestions = (data.suggestions as string[]) || [];
+                break;
 
               case 'done':
                 break;
@@ -190,14 +166,16 @@ export function useChatStream() {
         }
 
         // Add bot message with final content
+        const hasVisualization = responseType && responseType !== 'text' && responseType !== 'error';
         const botMessage: Message = {
           id: generateId(),
           type: 'bot',
-          content: accumulatedTextRef.current || 'Respuesta recibida.',
+          content: accumulatedTextRef.current || (hasVisualization ? '' : 'Respuesta recibida.'),
           timestamp: new Date(),
           responseType,
           tableData,
           chartData,
+          followUpSuggestions: followUpSuggestions.length > 0 ? followUpSuggestions : undefined,
         };
         addMessage(botMessage);
       } catch (err) {

@@ -9,10 +9,10 @@ interface WelcomeCardProps {
 }
 
 const suggestions = [
-  { icon: Map, text: 'Cobertura por zona en Bogota' },
-  { icon: Award, text: 'Top 10 restaurantes por pedidos' },
-  { icon: TrendingUp, text: 'Tendencia de ordenes esta semana' },
-  { icon: AlertTriangle, text: 'Alertas de tiempos de entrega' },
+  { icon: Map, text: 'Top 10 zonas con mayor volumen de ordenes esta semana' },
+  { icon: Award, text: 'Compara Perfect Orders entre zonas Wealthy y Non Wealthy en Mexico' },
+  { icon: TrendingUp, text: 'Evolucion de Gross Profit UE por pais en las ultimas 8 semanas' },
+  { icon: AlertTriangle, text: 'Cuales son las zonas problematicas con metricas deterioradas?' },
 ];
 
 export function WelcomeCard({ onSuggestionClick }: WelcomeCardProps) {
@@ -32,8 +32,8 @@ export function WelcomeCard({ onSuggestionClick }: WelcomeCardProps) {
         Rappi Analytics Assistant
       </h2>
       <p className="text-sm text-gray-500 max-w-md mb-8 leading-relaxed">
-        Pregunta sobre metricas operacionales, rendimiento de restaurantes,
-        tiempos de entrega y mas. Puedo generar tablas y graficos con datos en tiempo real.
+        Pregunta sobre metricas operacionales por zona, ordenes, rentabilidad,
+        adopcion y calidad de servicio. Puedo generar tablas y graficos con datos en tiempo real.
       </p>
 
       {/* Suggestion chips */}

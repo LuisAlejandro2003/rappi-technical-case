@@ -35,6 +35,14 @@ async def get_session(session_id: str, session_service: SessionService = Depends
     return session
 
 
+@router.delete("/sessions/{session_id}")
+async def delete_session(session_id: str, session_service: SessionService = Depends(get_session_service)):
+    deleted = session_service.delete_session(session_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return {"status": "deleted"}
+
+
 @router.get("/suggestions")
 async def get_suggestions(db: DuckDBService = Depends(get_db)):
     """Generate proactive analysis suggestions based on data patterns."""

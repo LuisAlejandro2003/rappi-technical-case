@@ -16,8 +16,7 @@ export interface TableData {
 
 export interface ChartDataPoint {
   label: string;
-  value: number;
-  value2?: number;
+  [key: string]: string | number;
 }
 
 export interface ChartData {
@@ -37,6 +36,7 @@ export interface Message {
   tableData?: TableData;
   chartData?: ChartData;
   processingStage?: string | null;
+  followUpSuggestions?: string[];
 }
 
 export interface Session {

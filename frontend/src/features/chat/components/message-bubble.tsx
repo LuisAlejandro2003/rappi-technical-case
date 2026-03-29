@@ -4,6 +4,7 @@ import { BarChart2, AlertCircle, RotateCcw, ArrowRight } from 'lucide-react';
 import { motion } from 'motion/react';
 import type { Message } from '@/types/api';
 import { DynamicChart } from '@/features/visualization/components/dynamic-chart';
+import { MarkdownRenderer } from './markdown-renderer';
 
 function generateFollowUps(message: Message): string[] {
   const followUps: string[] = [];
@@ -74,7 +75,9 @@ interface BotMessageProps {
 
 export function BotMessage({ message, onRetry, onFollowUp, isLatest }: BotMessageProps) {
   const isError = message.responseType === 'error';
-  const followUps = !isError && isLatest && onFollowUp ? generateFollowUps(message) : [];
+  const followUps = message.followUpSuggestions?.length
+    ? message.followUpSuggestions
+    : (!isError && isLatest && onFollowUp ? generateFollowUps(message) : []);
 
   return (
     <motion.div
@@ -104,7 +107,7 @@ export function BotMessage({ message, onRetry, onFollowUp, isLatest }: BotMessag
               : 'bg-white border border-gray-100 text-gray-800'
           }`}
         >
-          <p className="whitespace-pre-wrap">{message.content}</p>
+          <MarkdownRenderer content={message.content} />
 
           {isError && onRetry && (
             <button

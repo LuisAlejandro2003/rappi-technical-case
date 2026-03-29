@@ -13,6 +13,12 @@ class DuckDBService:
 
     def _load_all_csvs(self, data_dir: str) -> None:
         data_path = Path(data_dir)
+        if not data_path.is_absolute():
+            # Resolve relative paths from the project root (two levels up from this file)
+            project_root = Path(__file__).resolve().parent.parent.parent.parent
+            candidate = project_root / data_path
+            if candidate.exists():
+                data_path = candidate
         for csv_file in sorted(data_path.glob("*.csv")):
             table_name = csv_file.stem.lower()
             self.load_csv(table_name, str(csv_file))

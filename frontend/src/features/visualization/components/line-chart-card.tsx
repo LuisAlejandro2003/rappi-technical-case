@@ -23,16 +23,24 @@ export function LineChartCard({ data }: LineChartCardProps) {
   const { copyToClipboard, downloadCSV } = useChartExport();
 
   const handleCopy = useCallback(() => {
-    const header = `${xAxisLabel || 'Label'}\t${yAxisLabel || 'Value'}`;
-    const body = points.map((p) => `${p.label}\t${p.value}`).join('\n');
+    const seriesLabels = series?.map((s) => s.label) || [yAxisLabel || 'Value'];
+    const header = `${xAxisLabel || 'Label'}\t${seriesLabels.join('\t')}`;
+    const body = points.map((p) => {
+      const vals = (series || [{ key: 'value' }]).map((s) => p[s.key] ?? '');
+      return `${p.label}\t${vals.join('\t')}`;
+    }).join('\n');
     copyToClipboard(`${header}\n${body}`);
-  }, [points, xAxisLabel, yAxisLabel, copyToClipboard]);
+  }, [points, xAxisLabel, yAxisLabel, series, copyToClipboard]);
 
   const handleExport = useCallback(() => {
-    const header = `"${xAxisLabel || 'Label'}","${yAxisLabel || 'Value'}"`;
-    const body = points.map((p) => `"${p.label}",${p.value}`).join('\n');
+    const seriesLabels = series?.map((s) => s.label) || [yAxisLabel || 'Value'];
+    const header = `"${xAxisLabel || 'Label'}",${seriesLabels.map((l) => `"${l}"`).join(',')}`;
+    const body = points.map((p) => {
+      const vals = (series || [{ key: 'value' }]).map((s) => p[s.key] ?? '');
+      return `"${p.label}",${vals.join(',')}`;
+    }).join('\n');
     downloadCSV(title.replace(/\s+/g, '_'), `${header}\n${body}`);
-  }, [title, points, xAxisLabel, yAxisLabel, downloadCSV]);
+  }, [title, points, xAxisLabel, yAxisLabel, series, downloadCSV]);
 
   return (
     <ChartContainer

@@ -1,6 +1,10 @@
 import json
 import logging
+import re
+from pathlib import Path
 from typing import AsyncGenerator
+
+from jinja2 import Environment, FileSystemLoader
 
 from app.core.config import Settings
 
@@ -8,57 +12,42 @@ logger = logging.getLogger(__name__)
 from app.services.llm_provider import LLMProvider, LLMResponse
 from app.services.query_service import QueryService
 from app.services.session_service import SessionService
+from app.services.data_profiler import DataProfiler
 from app.models.schemas import Message, VizConfig, SSEEvent
 
+_TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
+_jinja_env = Environment(
+    loader=FileSystemLoader(str(_TEMPLATES_DIR)),
+    keep_trailing_newline=True,
+)
 
-SYSTEM_PROMPT_TEMPLATE = """You are Rappi Analytics Assistant, an AI chatbot that helps non-technical users analyze Rappi's operational data.
+_SUGGESTIONS_DELIMITER = "---SUGERENCIAS---"
+_SUGGESTION_PATTERN = re.compile(r"^\s*[-\u2022]\s*(.+)$", re.MULTILINE)
+_MAX_SUGGESTIONS = 3
 
-## Your Role
-- Translate natural language questions into SQL queries against DuckDB
-- Present results in a clear, helpful format
-- Suggest visualizations when appropriate
-- Respond in the same language the user writes (Spanish, Portuguese, or English)
 
-## IMPORTANT: Available Tables
-You ONLY have access to these 3 tables. Do NOT reference any other table names:
-1. raw_input_metrics — operational KPIs by zone (COUNTRY, CITY, ZONE, ZONE_TYPE, ZONE_PRIORITIZATION, METRIC, L8W_ROLL..L0W_ROLL)
-2. raw_orders — order counts by zone (COUNTRY, CITY, ZONE, METRIC, L8W..L0W)
-3. raw_summary — metadata/glossary (Column, Type, Examples, "Description (inferred)")
+def _extract_suggestions(text: str) -> tuple[str, list[str]]:
+    """Extract follow-up suggestions from LLM response text.
 
-Data is aggregated at the ZONE level (not restaurant or store level). If a user asks about individual restaurants/stores, explain that data is available at zone level and offer zone-level analysis instead.
+    Splits on the LAST occurrence of the suggestions delimiter, parses bullet
+    points after it, and returns (clean_text, suggestions_list).  Designed to
+    never raise on malformed input.
+    """
+    if not text:
+        return ("", [])
 
-## Database Schema (DDL + samples)
-{schema_context}
+    idx = text.rfind(_SUGGESTIONS_DELIMITER)
+    if idx == -1:
+        return (text, [])
 
-## SQL Guidelines for DuckDB
-- Use ONLY the column names shown in the DDL above
-- For raw_input_metrics: week columns are L8W_ROLL, L7W_ROLL, ..., L0W_ROLL (DOUBLE)
-- For raw_orders: week columns are L8W, L7W, ..., L0W (BIGINT)
-- L0W/L0W_ROLL = most recent week, L8W/L8W_ROLL = 8 weeks ago
-- METRIC column in raw_input_metrics contains metric names like 'Gross Profit UE', 'Perfect Orders', etc.
-- METRIC column in raw_orders always contains 'Orders'
-- Use single quotes for string literals: WHERE COUNTRY = 'CO'
-- Always include a LIMIT clause (max 100 rows)
+    clean_text = text[:idx].rstrip()
+    suggestions_block = text[idx + len(_SUGGESTIONS_DELIMITER) :]
 
-## Business Context
-- "Zonas problematicas" = zones with deteriorating metrics (L0W worse than L4W)
-- "Crecimiento" / "mejora" = positive trend (L0W better than L4W)
-- "Esta semana" = L0W (most recent week), "Semana pasada" = L1W
-- Zone types: 'Wealthy', 'Non Wealthy'
-- Zone priorities: 'High Priority', 'Prioritized', 'Not Prioritized'
-- Countries: AR, BR, CL, CO, CR, EC, MX, PE, UY
+    matches = _SUGGESTION_PATTERN.findall(suggestions_block)
+    suggestions = [s.strip() for s in matches if s.strip()]
 
-## Rules
-1. ALWAYS use the query_database tool to get data. NEVER make up numbers.
-2. Write ONE correct SQL query on your first attempt using the exact column/table names above.
-3. If a query fails, read the error carefully and fix the specific issue.
-4. When data is a time series (multiple weeks), use generate_visualization with type "line".
-5. When comparing categories (countries, zones, types), use generate_visualization with type "bar".
-6. For rankings or lists, present as formatted text.
-7. If the user asks about data not in these tables (e.g., individual restaurants, couriers, products), explain what IS available and suggest the closest analysis.
-8. Always explain what the data shows after presenting results.
-9. Use the metrics dictionary to understand metric definitions accurately.
-"""
+    return (clean_text, suggestions[:_MAX_SUGGESTIONS])
+
 
 TOOLS = [
     {
@@ -126,17 +115,30 @@ class ChatService:
         query_service: QueryService,
         session_service: SessionService,
         settings: Settings,
+        data_profiler: DataProfiler | None = None,
     ):
         self.llm = llm
         self.query_service = query_service
         self.session_service = session_service
         self.settings = settings
+        self.data_profiler = data_profiler
         self._system_prompt: str | None = None
 
     def build_system_prompt(self) -> str:
         if self._system_prompt is None:
             schema_ctx = self.query_service.get_schema_context()
-            self._system_prompt = SYSTEM_PROMPT_TEMPLATE.format(schema_context=schema_ctx)
+            data_profile = ""
+            if self.data_profiler:
+                try:
+                    data_profile = self.data_profiler.build_profile()
+                except Exception as e:
+                    logger.warning("Failed to build data profile: %s", e)
+                    data_profile = ""
+            template = _jinja_env.get_template("system_prompt.j2")
+            self._system_prompt = template.render(
+                schema_context=schema_ctx,
+                data_profile=data_profile,
+            )
         return self._system_prompt
 
     def build_tools(self) -> list[dict]:
@@ -148,6 +150,8 @@ class ChatService:
         # Create or get session
         if session_id is None:
             session_id = self.session_service.create_session()
+        else:
+            self.session_service.ensure_session_exists(session_id)
 
         # Save user message
         self.session_service.add_message(
@@ -171,17 +175,32 @@ class ChatService:
             # Tool loop
             max_iterations = 5
             assistant_text = ""
+            streamed = False
             viz_config = None
             sql_query = None
 
             for _ in range(max_iterations):
                 response = self.llm.generate(system_prompt, api_messages, tools)
 
+                has_tool_calls = response.tool_calls and response.stop_reason != "end_turn"
+
                 if response.content:
                     assistant_text += response.content
-                    yield SSEEvent(event="token", data={"text": response.content})
 
-                if not response.tool_calls or response.stop_reason == "end_turn":
+                if has_tool_calls:
+                    # Intermediate iteration: text goes to assistant_text for
+                    # conversation context but is NOT shown to the user.
+                    pass
+                else:
+                    # Final response: only stream THIS iteration's text
+                    if response.content:
+                        clean_text, suggestions = _extract_suggestions(response.content)
+                        yield SSEEvent(event="token", data={"text": clean_text})
+                        if suggestions:
+                            yield SSEEvent(event="follow_up_suggestions", data={"suggestions": suggestions})
+                        # Persist only the clean final text, not intermediate thinking
+                        assistant_text = clean_text
+                        streamed = True
                     break
 
                 # Process tool calls
@@ -226,6 +245,23 @@ class ChatService:
                             }
                         ],
                     })
+
+            # If the loop ended without streaming any text to the user, make one
+            # final call to force a text summary from the LLM.
+            if not streamed:
+                logger.info("No text streamed after tool loop. Forcing final text response.")
+                yield SSEEvent(event="status", data={"message": "Generando analisis..."})
+                api_messages.append({
+                    "role": "user",
+                    "content": "Ahora presenta tu análisis completo basado en los datos que consultaste. Responde con texto, no ejecutes más consultas.",
+                })
+                final_response = self.llm.generate(system_prompt, api_messages, tools)
+                if final_response.content:
+                    clean_text, suggestions = _extract_suggestions(final_response.content)
+                    assistant_text = clean_text
+                    yield SSEEvent(event="token", data={"text": clean_text})
+                    if suggestions:
+                        yield SSEEvent(event="follow_up_suggestions", data={"suggestions": suggestions})
 
             # Save assistant response
             self.session_service.add_message(
