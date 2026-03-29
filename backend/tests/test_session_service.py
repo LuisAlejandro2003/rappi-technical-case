@@ -64,18 +64,19 @@ class TestListSessions:
         session_service.create_session()
         session_service.create_session()
 
-        sessions = session_service.list_sessions()
-        assert len(sessions) == 3
+        result = session_service.list_sessions()
+        assert len(result["sessions"]) == 3
 
     def test_returns_most_recent_first(self, session_service: SessionService):
         id1 = session_service.create_session()
         id2 = session_service.create_session()
         id3 = session_service.create_session()
 
-        sessions = session_service.list_sessions()
-        assert sessions[0]["id"] == id3
-        assert sessions[1]["id"] == id2
-        assert sessions[2]["id"] == id1
+        result = session_service.list_sessions()
+        sessions = result["sessions"]
+        assert sessions[0]["session_id"] == id3
+        assert sessions[1]["session_id"] == id2
+        assert sessions[2]["session_id"] == id1
 
 
 class TestGetMessagesWindow:

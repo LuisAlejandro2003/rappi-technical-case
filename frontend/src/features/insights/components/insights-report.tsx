@@ -32,30 +32,6 @@ const CATEGORY_CONFIG: Record<string, { icon: LucideIcon; color: string; bgColor
   oportunidades:  { icon: Lightbulb,     color: '#10B981', bgColor: '#ECFDF5', label: 'Oportunidades' },
 };
 
-function getSeverityLabel(score: number): 'Alta' | 'Media' | 'Baja' {
-  if (score >= 0.5) return 'Alta';
-  if (score >= 0.2) return 'Media';
-  return 'Baja';
-}
-
-function severityBadgeClass(label: string): string {
-  const map: Record<string, string> = {
-    Alta: 'bg-red-100 text-red-700',
-    Media: 'bg-amber-100 text-amber-700',
-    Baja: 'bg-green-100 text-green-700',
-  };
-  return map[label] || 'bg-gray-100 text-gray-500';
-}
-
-function severityBorderClass(label: string): string {
-  const map: Record<string, string> = {
-    Alta: 'border-l-red-400',
-    Media: 'border-l-amber-400',
-    Baja: 'border-l-green-400',
-  };
-  return map[label] || 'border-l-gray-300';
-}
-
 function directionIcon(d: InsightFinding['direction']) {
   if (d === 'improvement') return <ArrowUpRight size={14} className="text-green-500" />;
   if (d === 'deterioration') return <ArrowDownRight size={14} className="text-red-500" />;

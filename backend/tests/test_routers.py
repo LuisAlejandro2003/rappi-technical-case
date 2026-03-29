@@ -86,7 +86,7 @@ class TestSessions:
         response = client.get("/chat/sessions")
         assert response.status_code == 200
         data = response.json()
-        assert len(data) == 2
+        assert len(data["sessions"]) == 2
 
     def test_get_session_with_messages(
         self, client: TestClient, session_service: SessionService
