@@ -122,8 +122,8 @@ Usuario escribe pregunta
 El LLM recibe contexto operacional a traves de tres capas:
 
 1. **Business Glossary** (`business_context.j2`) — Mapeo de terminos de negocio a SQL (ej: "zonas problematicas" = metricas deterioradas)
-2. **Few-Shot SQL** — 5 ejemplos representativos de NL→SQL
-3. **Data Profiler** (`data_profiler.py`) — Perfil estadistico generado al startup: promedios por pais, tendencias, zonas outlier, volumen de ordenes
+2. **Few-Shot SQL** — 5 ejemplos representativos de NL→SQL para que el LLM generalice patrones
+3. **Data Profiler** (`data_profiler.py`) — Al iniciar el backend, ejecuta 6 queries SQL automaticamente y genera un perfil estadistico (~4000 chars) que se inyecta en el system prompt. Incluye promedios por pais, direccion de tendencias (mejorando/declinando vs 4 semanas), zonas con mayor deterioro, top performers y volumen de ordenes. Esto permite que el LLM interprete resultados con el mismo contexto que tendria un analista que revisa un dashboard diariamente
 
 ## Modulo 2: Insights Automaticos
 
@@ -156,7 +156,7 @@ Cada hallazgo tiene un boton "Explorar en chat" que abre el chatbot con una preg
 
 - Valores en dolares se muestran como `$X.XX`, ratios como `X.X%`, cambios en puntos porcentuales (`pp`)
 - Magnitudes extremas se capean (SEVERITY_MAGNITUDE_CAP = 5.0) para evitar que outliers dominen
-- Maximo 2 hallazgos por metrica por categoria para forzar diversidad
+- Maximo 2 hallazgos por metrica por categoria
 - El LLM narrativo tiene restricciones explicitas: no inventar datos, no recalcular numeros, hipotesis como hipotesis
 
 ## Estructura del Proyecto
@@ -191,5 +191,4 @@ docs/
 ```bash
 cd backend
 pytest tests/ -v
-# 120+ tests: database, query validation, chat service, insights detectors, SQL injection prevention
 ```
