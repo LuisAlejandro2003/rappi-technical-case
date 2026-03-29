@@ -5,19 +5,29 @@ Sistema de analisis inteligente para operaciones Rappi. Dos modulos integrados:
 1. **Bot Conversacional** — Consultas en lenguaje natural traducidas a SQL contra datos operacionales
 2. **Insights Automaticos** — Deteccion automatica de anomalias, tendencias, benchmarking, correlaciones y oportunidades con reporte ejecutivo generado por IA
 
+## Requisitos Previos
+
+- Python 3.12+
+- Node.js 18+
+- Una API key de Anthropic (Claude)
+
+No se requiere instalar ni configurar ninguna base de datos. DuckDB es una libreria Python que carga los CSVs en memoria al iniciar el backend — cero configuracion de infraestructura.
+
 ## Quick Start
 
 ```bash
-# 1. Configurar API key
+# 1. Clonar y configurar
+git clone <repo-url>
+cd rappi
 cp .env.example .env
-# Editar .env y agregar ANTHROPIC_API_KEY
+# Editar .env y agregar tu ANTHROPIC_API_KEY
 
-# 2. Backend
+# 2. Backend (terminal 1)
 cd backend
-pip install -r requirements.txt   # o: uv sync
+pip install -r requirements.txt
 uvicorn app.main:app --reload --port 8000
 
-# 3. Frontend
+# 3. Frontend (terminal 2)
 cd frontend
 npm install
 npm run dev
@@ -26,6 +36,8 @@ npm run dev
 - Frontend: http://localhost:3000
 - Backend: http://localhost:8000
 - Health check: http://localhost:8000/health
+
+> **Nota**: Los archivos CSV (`data/RAW_INPUT_METRICS.csv`, `data/RAW_ORDERS.csv`, `data/RAW_SUMMARY.csv`) deben estar en la carpeta `data/` en la raiz del proyecto. Al iniciar, el backend los carga automaticamente en DuckDB.
 
 ## Arquitectura
 
