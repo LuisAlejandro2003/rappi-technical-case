@@ -7,27 +7,43 @@ Sistema de analisis inteligente para operaciones Rappi. Dos modulos integrados:
 
 ## Requisitos Previos
 
-- Python 3.12+
-- Node.js 18+
+- Docker y Docker Compose (recomendado), **o** Python 3.12+ y Node.js 18+
 - Una API key de Anthropic (Claude)
 
 No se requiere instalar ni configurar ninguna base de datos. DuckDB es una libreria Python que carga los CSVs en memoria al iniciar el backend — cero configuracion de infraestructura.
 
-## Quick Start
+## Quick Start con Docker (recomendado)
 
 ```bash
-# 1. Clonar y configurar
+git clone <repo-url>
+cd rappi
+
+# Configurar API key
+cp .env.example .env
+# Editar .env y agregar tu ANTHROPIC_API_KEY
+
+# Levantar todo
+docker compose up --build
+```
+
+Listo. Frontend en http://localhost:3000, backend en http://localhost:8000.
+
+## Quick Start sin Docker
+
+```bash
 git clone <repo-url>
 cd rappi
 cp .env.example .env
 # Editar .env y agregar tu ANTHROPIC_API_KEY
 
-# 2. Backend (terminal 1)
+# Backend (terminal 1)
 cd backend
+python -m venv .venv
+source .venv/bin/activate    # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 uvicorn app.main:app --reload --port 8000
 
-# 3. Frontend (terminal 2)
+# Frontend (terminal 2)
 cd frontend
 npm install
 npm run dev
@@ -37,7 +53,7 @@ npm run dev
 - Backend: http://localhost:8000
 - Health check: http://localhost:8000/health
 
-> **Nota**: Los archivos CSV (`data/RAW_INPUT_METRICS.csv`, `data/RAW_ORDERS.csv`, `data/RAW_SUMMARY.csv`) deben estar en la carpeta `data/` en la raiz del proyecto. Al iniciar, el backend los carga automaticamente en DuckDB.
+> **Nota**: Los CSVs de datos (`data/RAW_INPUT_METRICS.csv`, `data/RAW_ORDERS.csv`, `data/RAW_SUMMARY.csv`) ya estan incluidos en el repositorio. Al iniciar, el backend los carga automaticamente en DuckDB en memoria.
 
 ## Arquitectura
 
