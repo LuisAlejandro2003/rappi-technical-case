@@ -1,97 +1,195 @@
 # Rappi Operations Analytics Chatbot
 
-Natural-language-to-SQL analytics chatbot for Rappi operations data. Ask questions in plain language and get instant answers backed by SQL queries against operational datasets.
+Sistema de analisis inteligente para operaciones Rappi. Dos modulos integrados:
 
-## Architecture
+1. **Bot Conversacional** — Consultas en lenguaje natural traducidas a SQL contra datos operacionales
+2. **Insights Automaticos** — Deteccion automatica de anomalias, tendencias, benchmarking, correlaciones y oportunidades con reporte ejecutivo generado por IA
 
-- **Backend**: FastAPI + DuckDB + Anthropic Claude (Python 3.12, managed with uv)
-- **Frontend**: Next.js 14 + Tailwind CSS + Recharts (TypeScript)
-- **Data**: DuckDB over CSV files (RAW_ORDERS, RAW_SUMMARY, RAW_INPUT_METRICS)
-
-## Quick Start with Docker Compose
+## Quick Start
 
 ```bash
+# 1. Configurar API key
 cp .env.example .env
-# Edit .env and add your ANTHROPIC_API_KEY
+# Editar .env y agregar ANTHROPIC_API_KEY
 
-docker compose up --build
-```
-
-- Backend: http://localhost:8000
-- Frontend: http://localhost:3000
-- Health check: http://localhost:8000/health
-
-## Local Development
-
-### Backend
-
-```bash
+# 2. Backend
 cd backend
-uv sync
-uv run uvicorn app.main:app --reload --port 8000
-```
+pip install -r requirements.txt   # o: uv sync
+uvicorn app.main:app --reload --port 8000
 
-### Frontend
-
-```bash
+# 3. Frontend
 cd frontend
 npm install
 npm run dev
 ```
 
-## Business Context Architecture
+- Frontend: http://localhost:3000
+- Backend: http://localhost:8000
+- Health check: http://localhost:8000/health
 
-The chatbot understands operational business language through three layers that work together:
-
-### 1. Business Glossary (static)
-
-A Jinja2 template (`backend/app/templates/business_context.j2`) maps operational terminology to data logic. For example, "cobertura" maps to the Lead Penetration metric, "zonas en riesgo" maps to zones with declining trends over consecutive weeks. This allows non-technical users to ask questions in their natural business language without knowing column names or SQL syntax.
-
-### 2. Few-Shot SQL Examples (static)
-
-Five representative question-to-SQL pairs teach the LLM how to translate different types of analytical questions: rankings, comparisons, temporal trends, aggregations, and multi-metric analysis. The LLM generalizes these patterns to handle questions it hasn't seen before.
-
-### 3. Dynamic Data Profiler (runtime)
-
-The `DataProfiler` service (`backend/app/services/data_profiler.py`) runs SQL queries against the actual dataset at startup and generates a statistical summary that is injected into the LLM's system prompt. This summary includes:
-
-- **Metric distributions by country** — current averages for key KPIs across all 9 markets
-- **Trend directions** — whether each metric is improving or declining vs 4 weeks ago
-- **Outlier zones** — the zones with the largest recent declines and the best current performance
-- **Order volume by market** — scale of operations and growth/contraction per country
-- **Data glossary** — column definitions loaded from RAW_SUMMARY.csv
-
-This gives the LLM a real-time understanding of the current state of the business. When a user asks "how is Brazil doing?", the LLM already has the statistical context to provide an informed analysis — it knows the baselines, the trends, and the outliers. As the underlying data changes, the profile is automatically recalculated on the next backend restart.
-
-The profiler does not replace query execution. It provides the analytical context that allows the LLM to interpret query results with the same situational awareness that a human analyst would have after reviewing a dashboard.
-
-### Prompt Engineering
-
-System prompts are managed as modular Jinja2 templates (`backend/app/templates/`), separating content from application logic:
+## Arquitectura
 
 ```
-backend/app/templates/
-  system_prompt.j2        # Main template — role, schema, SQL guidelines
-  business_context.j2     # Glossary, metric thresholds, few-shot examples
-  response_rules.j2       # Formatting, analysis depth, output rules
+                         ┌─────────────────────────────────────────┐
+                         │           Frontend (Next.js 14)          │
+                         │                                         │
+                         │  ┌─────────────┐   ┌─────────────────┐  │
+                         │  │  Chat Tab   │   │  Insights Tab   │  │
+                         │  │  (SSE)      │   │  (SSE)          │  │
+                         │  └──────┬──────┘   └───────┬─────────┘  │
+                         └─────────┼──────────────────┼────────────┘
+                                   │                  │
+                    POST /chat/stream         POST /insights/generate
+                                   │                  │
+                         ┌─────────┼──────────────────┼────────────┐
+                         │         ▼                  ▼            │
+                         │  ┌─────────────┐   ┌─────────────────┐  │
+                         │  │ ChatService │   │InsightsService  │  │
+                         │  │ (tool loop) │   │(5 SQL detectors │  │
+                         │  │             │   │ + LLM narrative)│  │
+                         │  └──────┬──────┘   └───────┬─────────┘  │
+                         │         │                  │            │
+                         │         ▼                  ▼            │
+                         │  ┌─────────────────────────────────┐    │
+                         │  │   DuckDB (in-memory, CSV-based)  │    │
+                         │  │   3 tablas operacionales          │    │
+                         │  └─────────────────────────────────┘    │
+                         │           Backend (FastAPI)              │
+                         └─────────────────────────────────────────┘
 ```
 
-Dynamic context (schema DDL, data profile) is injected as template variables at render time.
+### Stack
 
-## Project Structure
+| Capa | Tecnologia | Justificacion |
+|------|-----------|---------------|
+| Backend | FastAPI + Python 3.12 | Async nativo, tipado, ecosystem AI |
+| Base de datos | DuckDB (in-memory) | OLAP columnar, 10-100x mas rapido que SQLite para agregaciones |
+| LLM | Claude via Anthropic SDK | Tool use nativo, sin LangChain |
+| Frontend | Next.js 14 + Tailwind + Recharts | App Router, SSE streaming, visualizaciones |
+| State | Zustand | Ligero, sin boilerplate |
+
+## Decisiones Tecnicas
+
+### DT-001: LLM como traductor, no calculadora
+
+El LLM traduce lenguaje natural a SQL. **Nunca calcula sobre datos crudos.** Si el usuario pregunta "promedio de Perfect Orders en Mexico", el LLM genera `SELECT AVG(L0W_ROLL) FROM raw_input_metrics WHERE COUNTRY='MX' AND METRIC='Perfect Orders'` — no intenta sumar valores en su contexto.
+
+**Por que**: El LLM no es calculadora (puede sumar mal o ignorar NULL). No escala (millones de filas no caben en context window). SQL es verificable, reproducible y auditable.
+
+### DT-002: DuckDB sobre PostgreSQL/SQLite
+
+DuckDB es un motor OLAP columnar in-memory. Para queries analiticas (GROUP BY, MEDIAN, ventanas temporales) es 10-100x mas rapido que SQLite y no requiere servidor como PostgreSQL.
+
+**Por que**: Los datos son CSVs estaticos cargados en memoria. No hay escrituras transaccionales (no necesitamos ACID). Las queries son 100% analiticas. DuckDB soporta funciones como `MEDIAN()`, `CORR()`, `read_csv_auto()` que simplifican el pipeline.
+
+### DT-003: SDK directo sin LangChain
+
+Usamos el Anthropic SDK directamente con un `LLMProvider` Protocol para abstraccion. No usamos LangChain.
+
+**Por que**: LangChain agrega 4-5 llamadas LLM innecesarias por interaccion y oculta el flujo de control. Con el SDK directo, el tool loop es explicito (max 5 iteraciones), controlamos exactamente que ve el LLM, y podemos hacer swap a otro proveedor implementando el mismo Protocol.
+
+### DT-004: Pipeline hibrido para Insights (SQL + LLM)
+
+La deteccion de insights es SQL deterministico (5 detectores). El LLM solo genera la narrativa del reporte ejecutivo a partir de hallazgos ya estructurados.
+
+**Por que**: "Vichayito tiene Gross Profit UE de -$97.13 vs mediana -$0.50" es un calculo exacto — no deberia depender del LLM. La IA agrega valor donde es irremplazable: interpretar los datos en contexto de negocio y generar recomendaciones accionables. Precision donde se necesita, inteligencia donde aporta.
+
+## Modulo 1: Bot Conversacional
+
+### Flujo
+
+```
+Usuario escribe pregunta
+    → LLM genera SQL (tool: query_database)
+    → sqlglot valida AST (solo SELECT, tablas permitidas)
+    → DuckDB ejecuta
+    → LLM genera visualizacion si aplica (tool: generate_visualization)
+    → LLM analiza resultados y responde con markdown
+    → Frontend renderiza texto + chart/tabla
+```
+
+### Capacidades
+
+- **Filtrado**: "Top 5 zonas con mayor Lead Penetration esta semana"
+- **Comparaciones**: "Compara Perfect Orders entre zonas Wealthy y Non Wealthy en Mexico"
+- **Tendencias temporales**: "Evolucion de Gross Profit UE en Chapinero ultimas 8 semanas"
+- **Agregaciones**: "Promedio de Lead Penetration por pais"
+- **Analisis multivariable**: "Zonas con alto Lead Penetration pero bajo Perfect Order"
+- **Inferencia**: "Zonas que mas crecen en ordenes y que podria explicar el crecimiento"
+
+### Contexto de Negocio
+
+El LLM recibe contexto operacional a traves de tres capas:
+
+1. **Business Glossary** (`business_context.j2`) — Mapeo de terminos de negocio a SQL (ej: "zonas problematicas" = metricas deterioradas)
+2. **Few-Shot SQL** — 5 ejemplos representativos de NL→SQL
+3. **Data Profiler** (`data_profiler.py`) — Perfil estadistico generado al startup: promedios por pais, tendencias, zonas outlier, volumen de ordenes
+
+## Modulo 2: Insights Automaticos
+
+### Pipeline
+
+```
+Click "Generar Reporte"
+    → 5 detectores SQL ejecutan en secuencia
+    → Severity scoring + dedup + diversidad de metricas
+    → Top 12-15 hallazgos estructurados
+    → LLM genera reporte narrativo en markdown
+    → Frontend renderiza: summary cards + resumen ejecutivo + categorias con cards
+```
+
+### Categorias de Deteccion
+
+| Categoria | Que detecta | Ejemplo |
+|-----------|-------------|---------|
+| Anomalias | Cambios >25% semana a semana | "GP UE paso de $0.00 a -$1.69 en GRAN_MENDOZA_GODOY" |
+| Tendencias | 3+ semanas consecutivas de deterioro | "GP UE lleva 5 semanas cayendo en Santo_Domingo" |
+| Benchmarking | Zonas >40% debajo de mediana de pares | "Vichayito: -$97.13 vs mediana -$0.50" |
+| Correlaciones | Metricas relacionadas ambas debiles | "Lead Penetration y Funnel CVR bajas en CiudadManteOps1" |
+| Oportunidades | Mejoras sostenidas o debilidades focalizadas | "GP UE mejora 5 semanas en GO-GYN-Centro (+$3.12)" |
+
+### Integracion Chat ↔ Insights
+
+Cada hallazgo tiene un boton "Explorar en chat" que abre el chatbot con una pregunta pre-construida para profundizar. El resumen de insights se inyecta en el system prompt del chat para que el LLM tenga contexto de los hallazgos mas recientes.
+
+### Calibracion
+
+- Valores en dolares se muestran como `$X.XX`, ratios como `X.X%`, cambios en puntos porcentuales (`pp`)
+- Magnitudes extremas se capean (SEVERITY_MAGNITUDE_CAP = 5.0) para evitar que outliers dominen
+- Maximo 2 hallazgos por metrica por categoria para forzar diversidad
+- El LLM narrativo tiene restricciones explicitas: no inventar datos, no recalcular numeros, hipotesis como hipotesis
+
+## Estructura del Proyecto
 
 ```
 backend/
   app/
-    core/       # Config, database
-    models/     # Pydantic schemas
-    services/   # Business logic (Claude, DuckDB, query pipeline, data profiler)
-    templates/  # Jinja2 prompt templates
-    routers/    # API endpoints
-    main.py     # FastAPI application
-  tests/
+    core/           # Settings, DuckDB service
+    models/         # Pydantic schemas (Message, Insight, InsightReport)
+    services/       # ChatService, InsightsService, QueryService, DataProfiler, LLMProvider
+    templates/      # Jinja2: system_prompt, business_context, response_rules, insights_prompt
+    routers/        # /chat (stream, sessions, suggestions) + /insights (generate, report)
+  tests/            # 120+ tests (pytest)
 frontend/
-  src/app/      # Next.js app router pages
-data/           # CSV data files
-docs/           # Project documentation
+  src/
+    app/            # Next.js App Router
+    components/     # Layout (header, sidebar, input-bar)
+    features/
+      chat/         # MessageBubble, MarkdownRenderer, useChatStream
+      insights/     # InsightsView, InsightsReport, InsightsLoading, InsightsEmpty
+      visualization/# LineChart, BarChart, DataTable, ChartContainer
+    stores/         # Zustand (chat-store, session-store, insights-store)
+    lib/            # API client, viz-utils
+data/               # CSV operacionales (RAW_INPUT_METRICS, RAW_ORDERS, RAW_SUMMARY)
+docs/
+  brainstorms/      # Documentos de diseno
+  plans/            # Planes de implementacion
+```
+
+## Tests
+
+```bash
+cd backend
+pytest tests/ -v
+# 120+ tests: database, query validation, chat service, insights detectors, SQL injection prevention
 ```
