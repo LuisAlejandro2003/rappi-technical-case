@@ -52,3 +52,43 @@ export interface ProactiveSuggestion {
   text: string;
   category: string;
 }
+
+// --- Insights System ---
+
+export type InsightSeverity = 'Alta' | 'Media' | 'Baja';
+export type InsightCategoryId = 'anomalias' | 'tendencias' | 'benchmarking' | 'correlaciones' | 'oportunidades';
+
+export interface InsightFinding {
+  id: string;
+  category: InsightCategoryId;
+  severity: number;
+  title: string;
+  description: string;
+  zone: string | null;
+  city: string | null;
+  country: string | null;
+  metrics: string[];
+  magnitude: number;
+  direction: 'improvement' | 'deterioration' | 'neutral';
+  recommendation: string;
+  explore_query: string;
+}
+
+export interface InsightReport {
+  id: string;
+  generated_at: string;
+  executive_summary: string;
+  findings: InsightFinding[];
+  category_counts: Record<string, number>;
+  markdown_report: string;
+  narrative_sections: Record<string, string>;
+}
+
+export interface InsightProgress {
+  step: string;
+  label: string;
+  status: 'running' | 'done';
+  step_number: number;
+  total_steps: number;
+  findings_count?: number;
+}

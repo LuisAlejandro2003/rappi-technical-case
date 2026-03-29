@@ -41,3 +41,32 @@ class Session(BaseModel):
 class SSEEvent(BaseModel):
     event: str  # "status", "token", "tool_call", "visualization", "done", "error"
     data: dict | str
+
+
+# --- Insights System ---
+
+class Insight(BaseModel):
+    id: str
+    category: Literal["anomalias", "tendencias", "benchmarking", "correlaciones", "oportunidades"]
+    severity: float
+    title: str
+    description: str
+    zone: str | None = None
+    city: str | None = None
+    country: str | None = None
+    metrics: list[str]
+    magnitude: float
+    direction: Literal["improvement", "deterioration", "neutral"]
+    recommendation: str = ""
+    explore_query: str = ""
+
+
+class InsightReport(BaseModel):
+    id: str
+    generated_at: datetime = Field(default_factory=datetime.now)
+    executive_summary: str = ""
+    findings: list[Insight] = []
+    category_counts: dict[str, int] = {}
+    markdown_report: str = ""
+    # Narrative sections parsed from LLM markdown
+    narrative_sections: dict[str, str] = {}  # e.g. {"anomalias": "...", "tendencias": "..."}

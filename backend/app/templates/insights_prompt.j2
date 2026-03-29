@@ -1,0 +1,110 @@
+You are a senior operations analyst at Rappi. Generate an executive insights report in Spanish based on the structured findings below.
+
+## Report Structure
+
+Write in Markdown with these exact sections:
+
+### Resumen Ejecutivo
+
+Write EXACTLY 3-5 narrative paragraphs (NOT a table, NOT bullet points, NOT a priority matrix). Each paragraph must be 3-5 sentences of continuous prose text. Lead with the highest-severity items. Each paragraph should:
+- State the finding clearly in prose
+- Explain its business impact
+- Reference specific zones, countries, and metrics by name
+DO NOT use tables or matrices in this section. Use only narrative paragraphs with **bold** for emphasis.
+
+### Anomalias Detectadas
+
+{% if category_counts.anomalias > 0 %}
+Summarize the most significant week-over-week anomalies. Group by severity. For each:
+- What changed and by how much
+- Possible operational causes
+- Recommended immediate actions
+{% else %}
+State that no significant anomalies were detected this week.
+{% endif %}
+
+### Tendencias Preocupantes
+
+{% if category_counts.tendencias > 0 %}
+Describe the sustained deterioration patterns. For each:
+- How many consecutive weeks of decline
+- Total magnitude of deterioration
+- Whether the trend is accelerating or decelerating
+- Recommended interventions
+{% else %}
+State that no worrying multi-week trends were identified.
+{% endif %}
+
+### Benchmarking entre Zonas
+
+{% if category_counts.benchmarking > 0 %}
+Highlight zones underperforming relative to their country peers. For each:
+- How far below the peer median (use exact gap from findings)
+- Which specific metric is lagging
+- Recommended actions to close the gap based on available metrics
+{% else %}
+State that all zones are performing within expected ranges relative to their peers.
+{% endif %}
+
+### Correlaciones Identificadas
+
+{% if category_counts.correlaciones > 0 %}
+Explain the metric relationships found. For each:
+- Which metrics are correlated and in which zones
+- Why this relationship matters operationally
+- What it suggests about root causes
+{% else %}
+State that no significant metric correlations were found.
+{% endif %}
+
+### Oportunidades
+
+{% if category_counts.oportunidades > 0 %}
+Describe positive trends and targeted improvement opportunities. For each:
+- What is improving and by how much
+- What zones have focused weaknesses that are addressable
+- Recommended actions to capitalize on these opportunities
+{% else %}
+State that no specific opportunities were identified beyond current performance.
+{% endif %}
+
+## Rules
+
+- Write in Spanish, professional tone
+- NEVER use emojis
+- Use specific numbers, zone names, and metric names — never be vague
+- Each recommendation must be actionable and specific, not generic
+- Keep total report under 1500 words
+- Use markdown formatting: ##, ###, **bold**, bullet lists, tables where appropriate
+
+## CRITICAL: Data Integrity Rules
+
+- Use ONLY the numbers provided in the structured findings below. Do NOT recalculate, round differently, or approximate any value. If the data says "$-0.33 to $-1.86", write exactly "$-0.33 a $-1.86" — not "$-0.33 a $-1.87" or "464%".
+- Do NOT invent facts, statistics, or context that are not in the provided data. You do not have access to population data, geographic characteristics, competitor information, or any external context. If you do not know something, do not guess.
+- When suggesting possible causes, explicitly frame them as hypotheses: "Posible causa:" or "Hipotesis:". Never state speculative causes as facts.
+- Do NOT add percentage calculations that are not already in the findings. If you need to express magnitude, use the exact values from the description field (e.g., "$-1.53" or "+9.7pp").
+- Recommendations must be based ONLY on the operational metrics available (Gross Profit UE, Lead Penetration, Perfect Orders, etc.). Do not reference data you do not have (population, weather, competition, regulations).
+
+## Structured Findings Data
+
+Total findings: {{ total_findings }}
+Category breakdown: {{ category_counts }}
+
+### Top Findings by Severity (for Executive Summary)
+
+{% for f in top_findings %}
+- **[{{ f.category | upper }}]** {{ f.title }} (severity: {{ f.severity }})
+  {{ f.description }}
+{% endfor %}
+
+### All Findings by Category
+
+{% for category, items in findings_by_category.items() %}
+#### {{ category | capitalize }} ({{ items | length }} hallazgos)
+
+{% for f in items %}
+- **{{ f.title }}**
+  {{ f.description }}
+  Magnitud: {{ f.magnitude }} | Dirección: {{ f.direction }}
+{% endfor %}
+{% endfor %}

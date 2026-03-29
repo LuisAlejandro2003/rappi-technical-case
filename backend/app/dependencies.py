@@ -7,6 +7,7 @@ from app.services.query_service import QueryService
 from app.services.chat_service import ChatService
 from app.services.llm_provider import ClaudeLLMProvider
 from app.services.data_profiler import DataProfiler
+from app.services.insights_service import InsightsService
 
 
 @lru_cache
@@ -28,6 +29,7 @@ def get_db() -> DuckDBService:
 _session_service: SessionService | None = None
 _query_service: QueryService | None = None
 _data_profiler: DataProfiler | None = None
+_insights_service: InsightsService | None = None
 _chat_service: ChatService | None = None
 
 
@@ -52,6 +54,15 @@ def get_data_profiler() -> DataProfiler:
     return _data_profiler
 
 
+def get_insights_service() -> InsightsService:
+    global _insights_service
+    if _insights_service is None:
+        settings = get_settings()
+        llm = ClaudeLLMProvider(api_key=settings.anthropic_api_key, model=settings.claude_model)
+        _insights_service = InsightsService(db=get_db(), llm=llm)
+    return _insights_service
+
+
 def get_chat_service() -> ChatService:
     global _chat_service
     if _chat_service is None:
@@ -64,4 +75,7 @@ def get_chat_service() -> ChatService:
             settings=settings,
             data_profiler=get_data_profiler(),
         )
+        # Link insights summary to chat context
+        insights_svc = get_insights_service()
+        _chat_service._insights_summary_fn = insights_svc.build_insights_summary
     return _chat_service

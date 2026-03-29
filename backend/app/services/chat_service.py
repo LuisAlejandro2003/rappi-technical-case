@@ -122,10 +122,12 @@ class ChatService:
         self.session_service = session_service
         self.settings = settings
         self.data_profiler = data_profiler
+        self._insights_summary_fn = None  # callable that returns str | None
         self._system_prompt: str | None = None
+        self._last_insights_summary: str | None = None
 
-    def build_system_prompt(self) -> str:
-        if self._system_prompt is None:
+    def build_system_prompt(self, insights_summary: str | None = None) -> str:
+        if self._system_prompt is None or insights_summary != self._last_insights_summary:
             schema_ctx = self.query_service.get_schema_context()
             data_profile = ""
             if self.data_profiler:
@@ -138,7 +140,9 @@ class ChatService:
             self._system_prompt = template.render(
                 schema_context=schema_ctx,
                 data_profile=data_profile,
+                insights_summary=insights_summary or "",
             )
+            self._last_insights_summary = insights_summary
         return self._system_prompt
 
     def build_tools(self) -> list[dict]:
@@ -168,7 +172,8 @@ class ChatService:
             {"role": m.role, "content": m.content} for m in messages_window
         ]
 
-        system_prompt = self.build_system_prompt()
+        insights_summary = self._insights_summary_fn() if self._insights_summary_fn else None
+        system_prompt = self.build_system_prompt(insights_summary=insights_summary)
         tools = self.build_tools()
 
         try:

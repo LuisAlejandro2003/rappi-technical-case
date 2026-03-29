@@ -1,14 +1,16 @@
 "use client";
 
 import { Paperclip, Send } from 'lucide-react';
-import { useState, useRef, useCallback, type KeyboardEvent } from 'react';
+import { useState, useRef, useCallback, useEffect, type KeyboardEvent } from 'react';
 
 interface InputBarProps {
   onSend: (message: string) => void;
   disabled?: boolean;
+  prefillText?: string;
+  onPrefillConsumed?: () => void;
 }
 
-export function InputBar({ onSend, disabled = false }: InputBarProps) {
+export function InputBar({ onSend, disabled = false, prefillText, onPrefillConsumed }: InputBarProps) {
   const [text, setText] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -19,6 +21,19 @@ export function InputBar({ onSend, disabled = false }: InputBarProps) {
       textarea.style.height = `${Math.min(textarea.scrollHeight, 120)}px`;
     }
   }, []);
+
+  // Handle external prefill
+  useEffect(() => {
+    if (prefillText) {
+      setText(prefillText);
+      onPrefillConsumed?.();
+      // Focus the textarea
+      setTimeout(() => {
+        textareaRef.current?.focus();
+        adjustHeight();
+      }, 0);
+    }
+  }, [prefillText, onPrefillConsumed, adjustHeight]);
 
   const handleSend = useCallback(() => {
     const trimmed = text.trim();

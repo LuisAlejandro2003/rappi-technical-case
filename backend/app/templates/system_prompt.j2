@@ -31,4 +31,8 @@ Data is aggregated at the ZONE level (not restaurant or store level). If a user 
 
 {{ data_profile }}
 
+{% if insights_summary %}
+{{ insights_summary }}
+{% endif %}
+
 {% include 'response_rules.j2' %}
